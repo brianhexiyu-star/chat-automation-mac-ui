@@ -1,47 +1,37 @@
 import SwiftUI
 
-/// Right-half main window — Sidebar + tabbed work area.
+/// Right-half main window — tabbed work area + Sidebar.
 struct MainWindowView: View {
     @EnvironmentObject var appState: AppState
 
     var body: some View {
         HStack(spacing: 0) {
-            // Left: Sidebar
-            SidebarView()
-                .frame(width: DesignSystem.sidebarWidth)
-
-            // Divider
-            Rectangle()
-                .fill(DesignSystem.Colors.separator)
-                .frame(width: 1)
-
-            // Right: Tabbed main area
+            // Left: Tabbed main area
             VStack(spacing: 0) {
                 TabBarView()
                 Divider()
                     .background(DesignSystem.Colors.separator)
                 TabContentView()
             }
+
+            // Divider
+            Rectangle()
+                .fill(DesignSystem.Colors.separator)
+                .frame(width: 1)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            let newWidth = 220 + value.translation.width
+                            appState.sidebarWidth = max(50, min(400, newWidth))
+                        }
+                )
+
+            // Right: Sidebar
+            SidebarView()
+                .frame(width: appState.sidebarExpanded ? appState.sidebarWidth : 50)
         }
         .background(DesignSystem.Colors.backgroundPrimary)
         .preferredColorScheme(.dark)
-        // Auto-rotate tabs when running
-        .onReceive(
-            Timer.publish(every: 4, on: .main, in: .common).autoconnect()
-        ) { _ in
-            if appState.mode == .running {
-                rotateTab()
-            }
-        }
-    }
-
-    private func rotateTab() {
-        let tabs = AppState.Tab.allCases
-        guard let idx = tabs.firstIndex(of: appState.activeTab) else { return }
-        let next = (idx + 1) % tabs.count
-        withAnimation(.easeInOut(duration: 0.35)) {
-            appState.activeTab = tabs[next]
-        }
     }
 }
 
@@ -77,9 +67,7 @@ struct TabButtonView: View {
     var body: some View {
         Button {
             if isInteractive {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    appState.activeTab = tab
-                }
+                appState.activeTab = tab
             }
         } label: {
             VStack(spacing: 3) {
@@ -99,6 +87,8 @@ struct TabButtonView: View {
                     .frame(height: 2)
                     .padding(.horizontal, DesignSystem.Spacing.lg)
             }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .background(
@@ -107,7 +97,6 @@ struct TabButtonView: View {
                 : Color.clear
         )
         .onHover { isHovered = $0 }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
         .opacity(isInteractive ? 1.0 : 0.7)
     }
 }
@@ -121,9 +110,7 @@ struct RunStopButton: View {
 
     var body: some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                isRunning ? appState.stopAutomation() : appState.startAutomation()
-            }
+            isRunning ? appState.stopAutomation() : appState.startAutomation()
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: isRunning ? "stop.fill" : "play.fill")
@@ -137,12 +124,11 @@ struct RunStopButton: View {
             .background(
                 RoundedRectangle(cornerRadius: DesignSystem.Radius.sm)
                     .fill(isRunning ? DesignSystem.Colors.accentRed : DesignSystem.Colors.accent)
-                    .shadow(color: (isRunning ? DesignSystem.Colors.accentRed : DesignSystem.Colors.accent).opacity(0.4), radius: 6, y: 2)
             )
-            .scaleEffect(isHovered ? 1.03 : 1.0)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
+        .animation(.easeOut(duration: 0.15), value: isHovered)
         .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 }
@@ -162,7 +148,5 @@ struct TabContentView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(DesignSystem.Colors.backgroundPrimary)
-        .transition(.opacity)
-        .animation(.easeInOut(duration: 0.3), value: appState.activeTab)
     }
 }

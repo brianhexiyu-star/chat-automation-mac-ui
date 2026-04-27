@@ -20,7 +20,7 @@ class WindowManager {
         let screenFrame = screen.visibleFrame
         let targetFrame = CGRect(
             x: screenFrame.minX,
-            y: screenFrame.minY + screenFrame.height / 2,
+            y: screenFrame.minY,
             width: screenFrame.width / 2,
             height: screenFrame.height / 2
         )

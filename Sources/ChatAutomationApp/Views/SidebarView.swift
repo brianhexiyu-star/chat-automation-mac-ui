@@ -1,18 +1,53 @@
 import SwiftUI
 
-/// Left sidebar — manages target app list and shows status.
+/// Right sidebar — manages target app list and shows status.
+/// Supports collapsed (icon-only) and expanded (full) modes.
 struct SidebarView: View {
     @EnvironmentObject var appState: AppState
     @State private var showAddSheet = false
     @State private var newAppName = ""
     @State private var newBundleId = ""
 
+    private var isExpanded: Bool { appState.sidebarExpanded }
+
     var body: some View {
         VStack(spacing: 0) {
-
-            // ── Header ──────────────────────────────────────────
+            // Toggle button at top
             HStack {
-                // App Logo / Title
+                Spacer()
+                Button {
+                    appState.sidebarExpanded.toggle()
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.right" : "chevron.left")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.sm)
+            .padding(.top, DesignSystem.Spacing.sm)
+
+            if isExpanded {
+                // Expanded: Full view
+                expandedContent
+            } else {
+                // Collapsed: Icon-only view
+                collapsedContent
+            }
+        }
+        .background(DesignSystem.Colors.backgroundSecondary)
+        .sheet(isPresented: $showAddSheet) {
+            AddAppSheet(isPresented: $showAddSheet)
+        }
+    }
+
+    // MARK: - Expanded Content
+    private var expandedContent: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
                 HStack(spacing: 8) {
                     Image(systemName: "bolt.circle.fill")
                         .font(.system(size: 20))
@@ -24,16 +59,29 @@ struct SidebarView: View {
                 Spacer()
             }
             .padding(.horizontal, DesignSystem.Spacing.lg)
-            .padding(.top, DesignSystem.Spacing.xl)
+            .padding(.top, DesignSystem.Spacing.md)
             .padding(.bottom, DesignSystem.Spacing.lg)
 
-            // ── Section Label ────────────────────────────────────
-            SectionLabel(title: "TARGET APPS")
+            // Section Label
+            HStack {
+                SectionLabel(title: "TARGET APPS")
+                Spacer()
+                Button {
+                    appState.refreshRunningApps()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 11))
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(appState.mode == .running)
+            }
+            .padding(.horizontal, DesignSystem.Spacing.lg)
 
-            // ── App List ─────────────────────────────────────────
+            // App List
             ScrollView {
                 VStack(spacing: DesignSystem.Spacing.xs) {
-                    ForEach(appState.targetApps) { app in
+                    ForEach(appState.allTargetApps) { app in
                         AppRowView(app: app)
                     }
                 }
@@ -43,7 +91,7 @@ struct SidebarView: View {
 
             Spacer()
 
-            // ── Add Button ───────────────────────────────────────
+            // Add Button
             Button {
                 showAddSheet = true
             } label: {
@@ -61,18 +109,89 @@ struct SidebarView: View {
                     RoundedRectangle(cornerRadius: DesignSystem.Radius.sm)
                         .stroke(DesignSystem.Colors.border, lineWidth: 1)
                 )
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .padding(DesignSystem.Spacing.md)
             .disabled(appState.mode == .running)
 
-            // ── Status Footer ────────────────────────────────────
+            // Status Footer
             StatusFooter()
         }
-        .background(DesignSystem.Colors.backgroundSecondary)
-        .sheet(isPresented: $showAddSheet) {
-            AddAppSheet(isPresented: $showAddSheet)
+    }
+
+    // MARK: - Collapsed Content (Icon Only)
+    private var collapsedContent: some View {
+        VStack(spacing: DesignSystem.Spacing.md) {
+            // App icons only
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.sm) {
+                    ForEach(appState.allTargetApps) { app in
+                        CollapsedAppIcon(app: app)
+                    }
+                }
+                .padding(.vertical, DesignSystem.Spacing.sm)
+            }
+
+            Spacer()
+
+            // Add button (icon only)
+            Button {
+                showAddSheet = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 14))
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(DesignSystem.Colors.backgroundTertiary)
+                    .cornerRadius(DesignSystem.Radius.sm)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(appState.mode == .running)
+            .padding(.bottom, DesignSystem.Spacing.md)
+
+            // Status indicator
+            Circle()
+                .fill(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
+                .frame(width: 8, height: 8)
+                .padding(.bottom, DesignSystem.Spacing.lg)
         }
+        .padding(.horizontal, DesignSystem.Spacing.sm)
+    }
+}
+
+// MARK: - Collapsed App Icon
+struct CollapsedAppIcon: View {
+    let app: AppState.TargetApp
+    @EnvironmentObject var appState: AppState
+
+    private var isSelected: Bool { appState.selectedAppId == app.id }
+
+    var body: some View {
+        Button {
+            if appState.mode == .idle {
+                let wasNotSelected = appState.selectedAppId != app.id
+                appState.selectedAppId = appState.selectedAppId == app.id ? nil : app.id
+                if wasNotSelected {
+                    WindowManager.shared.focusAndSnap(bundleIdentifier: app.bundleIdentifier, appState: appState)
+                }
+            }
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(isSelected ? DesignSystem.Colors.accent.opacity(0.2) : DesignSystem.Colors.backgroundTertiary)
+                    .frame(width: 36, height: 36)
+
+                Text(String(app.name.prefix(1)))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(isSelected ? DesignSystem.Colors.accent : DesignSystem.Colors.textSecondary)
+            }
+            .frame(width: 36, height: 36)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .opacity(appState.mode == .running ? 0.7 : 1.0)
     }
 }
 
@@ -127,19 +246,17 @@ struct AppRowView: View {
             RoundedRectangle(cornerRadius: DesignSystem.Radius.sm)
                 .stroke(isSelected ? DesignSystem.Colors.accent.opacity(0.4) : Color.clear, lineWidth: 1)
         )
+        .contentShape(Rectangle())
         .onHover { isHovered = $0 }
         .onTapGesture {
             if appState.mode == .idle {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    appState.selectedAppId = isSelected ? nil : app.id
-                }
-                if !isSelected {
+                let wasNotSelected = appState.selectedAppId != app.id
+                appState.selectedAppId = appState.selectedAppId == app.id ? nil : app.id
+                if wasNotSelected {
                     WindowManager.shared.focusAndSnap(bundleIdentifier: app.bundleIdentifier, appState: appState)
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
-        .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 
@@ -229,8 +346,7 @@ struct AddAppSheet: View {
                 Spacer()
                 Button("Add") {
                     guard !name.isEmpty, !bundleId.isEmpty else { return }
-                    let newApp = AppState.TargetApp(id: UUID(), name: name, bundleIdentifier: bundleId)
-                    appState.targetApps.append(newApp)
+                    appState.addManualApp(name: name, bundleIdentifier: bundleId)
                     isPresented = false
                 }
                 .buttonStyle(.plain)

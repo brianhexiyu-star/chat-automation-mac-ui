@@ -12,6 +12,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Wire up services with shared state
         PythonBridge.shared.configure(appState: appState)
 
+        // Initial refresh of running apps
+        appState.refreshRunningApps()
+
         guard let screen = NSScreen.main else { return }
 
         let screenFrame = screen.visibleFrame  // respects Dock and menu bar
