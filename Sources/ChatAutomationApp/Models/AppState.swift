@@ -138,6 +138,57 @@ class AppState: ObservableObject {
         enum AnnotationType { case clickTarget, ocrText }
     }
 
+    // MARK: - Config / Drawing Mode
+    @Published var isConfigMode: Bool = false
+    @Published var configSnapshot: NSImage? = nil
+    @Published var uiElementConfigs: [UIElementConfig] = []
+    @Published var selectedElementType: UIElementConfig.ElementType = .entryBox
+    @Published var currentDrawingRect: CGRect? = nil
+
+    /// The bundle ID of the currently selected target app, if any.
+    var selectedBundleIdentifier: String? {
+        guard let id = selectedAppId else { return nil }
+        return allTargetApps.first(where: { $0.id == id })?.bundleIdentifier
+    }
+
+    /// Enter config mode: take screenshot and switch Tracker window to drawing view.
+    func enterConfigMode() {
+        guard selectedBundleIdentifier != nil else {
+            addLog("Please select a target app before configuring.", level: .warning)
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let image = ScreenshotService.captureTopLeftQuarter()
+            DispatchQueue.main.async {
+                self.configSnapshot = image
+                // Load previously saved config for this app
+                if let bundleId = self.selectedBundleIdentifier,
+                   let saved = ConfigPersistence.load(for: bundleId) {
+                    self.uiElementConfigs = saved.elements
+                } else {
+                    self.uiElementConfigs = []
+                }
+                self.isConfigMode = true
+            }
+        }
+    }
+
+    /// Exit config mode without saving.
+    func exitConfigMode() {
+        isConfigMode = false
+        configSnapshot = nil
+        currentDrawingRect = nil
+    }
+
+    /// Save current annotations and exit config mode.
+    func saveAndExitConfigMode() {
+        guard let bundleId = selectedBundleIdentifier else { return }
+        let config = AppUIConfig(targetBundleIdentifier: bundleId, elements: uiElementConfigs)
+        ConfigPersistence.save(config)
+        addLog("UI config saved for \(bundleId) (\(uiElementConfigs.count) elements).", level: .success)
+        exitConfigMode()
+    }
+
     // MARK: - Python Bridge
     @Published var pythonRunning: Bool = false
 

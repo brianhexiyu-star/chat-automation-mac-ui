@@ -6,6 +6,10 @@
     <key>NSAccessibilityUsageDescription</key>
     <string>Chat Automator needs Accessibility access to move and control target application windows.</string>
 
+    <!-- Required for CGWindowListCreateImage (config screenshot) -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Chat Automator takes a screenshot of the target app region so you can draw UI element boundaries for automation configuration.</string>
+
     <!-- Required for AppleScript fallback (window management) -->
     <key>NSAppleEventsUsageDescription</key>
     <string>Chat Automator uses Apple Events to manage windows of other applications.</string>

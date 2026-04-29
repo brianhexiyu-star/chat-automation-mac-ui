@@ -1,7 +1,9 @@
 import SwiftUI
 import AppKit
 
-/// Bottom-left quarter window — shows periodic OCR snapshots with annotation overlays.
+/// Bottom-left quarter window.
+/// Shows periodic OCR snapshots in normal mode, or the
+/// interactive drawing canvas when isConfigMode == true.
 struct TrackerWindowView: View {
     @EnvironmentObject var appState: AppState
 
@@ -9,7 +11,12 @@ struct TrackerWindowView: View {
         VStack(spacing: 0) {
             TrackerHeaderView()
             Divider().background(DesignSystem.Colors.separator)
-            TrackerCanvasView()
+
+            if appState.isConfigMode {
+                ConfigDrawingView()
+            } else {
+                TrackerCanvasView()
+            }
         }
         .background(DesignSystem.Colors.backgroundPrimary)
         .preferredColorScheme(.dark)
@@ -22,44 +29,58 @@ struct TrackerHeaderView: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
-            Image(systemName: "eye.circle.fill")
+            Image(systemName: appState.isConfigMode ? "square.dashed" : "eye.circle.fill")
                 .font(.system(size: 16))
-                .foregroundColor(DesignSystem.Colors.accent)
+                .foregroundColor(appState.isConfigMode ? DesignSystem.Colors.accentAmber : DesignSystem.Colors.accent)
 
-            Text("Vision Tracker")
+            Text(appState.isConfigMode ? "Configure UI" : "Vision Tracker")
                 .font(DesignSystem.Typography.title)
                 .foregroundColor(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
-            // OCR refresh status pill
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: appState.mode == .running ? DesignSystem.Colors.accentGreen.opacity(0.7) : .clear, radius: 3)
-                Text(appState.mode == .running ? "Scanning" : "Standby")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(appState.mode == .running
-                          ? DesignSystem.Colors.accentGreen.opacity(0.12)
-                          : DesignSystem.Colors.backgroundTertiary)
-            )
+            if appState.isConfigMode {
+                // Config mode pill
+                HStack(spacing: 5) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 10))
+                    Text("\(appState.uiElementConfigs.count)/3 labeled")
+                        .font(DesignSystem.Typography.caption)
+                }
+                .foregroundColor(DesignSystem.Colors.accentAmber)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(DesignSystem.Colors.accentAmber.opacity(0.12)))
+            } else {
+                // OCR status pill
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
+                        .frame(width: 6, height: 6)
+                        .shadow(color: appState.mode == .running ? DesignSystem.Colors.accentGreen.opacity(0.7) : .clear, radius: 3)
+                    Text(appState.mode == .running ? "Scanning" : "Standby")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(appState.mode == .running
+                              ? DesignSystem.Colors.accentGreen.opacity(0.12)
+                              : DesignSystem.Colors.backgroundTertiary)
+                )
 
-            // Annotation count badge
-            if !appState.trackerAnnotations.isEmpty {
-                Text("\(appState.trackerAnnotations.count) detected")
-                    .font(DesignSystem.Typography.caption)
-                    .foregroundColor(DesignSystem.Colors.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(DesignSystem.Colors.accent.opacity(0.12))
-                    .cornerRadius(DesignSystem.Radius.sm)
+                // Annotation count badge
+                if !appState.trackerAnnotations.isEmpty {
+                    Text("\(appState.trackerAnnotations.count) detected")
+                        .font(DesignSystem.Typography.caption)
+                        .foregroundColor(DesignSystem.Colors.accent)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(DesignSystem.Colors.accent.opacity(0.12))
+                        .cornerRadius(DesignSystem.Radius.sm)
+                }
             }
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)
@@ -133,6 +154,43 @@ struct StandbyPlaceholderView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
+
+            // ── Config Button ────────────────────────────────
+            Button {
+                appState.enterConfigMode()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 12))
+                    Text("Configure Target UI")
+                        .font(DesignSystem.Typography.bodyMedium)
+
+                    // Tick if config already exists for selected app
+                    if let bundleId = appState.selectedBundleIdentifier,
+                       ConfigPersistence.hasConfig(for: bundleId) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundColor(DesignSystem.Colors.accentGreen)
+                    }
+                }
+                .foregroundColor(appState.selectedAppId != nil ? .white : DesignSystem.Colors.textTertiary)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 9)
+                .background(
+                    RoundedRectangle(cornerRadius: DesignSystem.Radius.md)
+                        .fill(appState.selectedAppId != nil
+                              ? DesignSystem.Colors.accent
+                              : DesignSystem.Colors.backgroundTertiary)
+                        .shadow(
+                            color: appState.selectedAppId != nil
+                                ? DesignSystem.Colors.accent.opacity(0.35) : .clear,
+                            radius: 8, y: 3
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(appState.selectedAppId == nil)
+            .padding(.top, DesignSystem.Spacing.lg)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
