@@ -24,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMainWindow(screenFrame: screenFrame, halfW: halfW)
         setupTrackerWindow(screenFrame: screenFrame, halfW: halfW, halfH: halfH)
 
+
         NSApp.activate(ignoringOtherApps: true)
     }
 
@@ -79,6 +80,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.backgroundColor = NSColor(DesignSystem.Colors.backgroundPrimary)
+        window.isMovableByWindowBackground = false
         window.collectionBehavior = [.canJoinAllSpaces]
         window.level = .normal
 
@@ -89,6 +91,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFront(nil)
         self.trackerWindow = window
     }
+
+
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         return true

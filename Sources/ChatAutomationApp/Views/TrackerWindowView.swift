@@ -12,11 +12,7 @@ struct TrackerWindowView: View {
             TrackerHeaderView()
             Divider().background(DesignSystem.Colors.separator)
 
-            if appState.isConfigMode {
-                ConfigDrawingView()
-            } else {
-                TrackerCanvasView()
-            }
+            TrackerCanvasView()
         }
         .background(DesignSystem.Colors.backgroundPrimary)
         .preferredColorScheme(.dark)
@@ -29,30 +25,17 @@ struct TrackerHeaderView: View {
 
     var body: some View {
         HStack(spacing: DesignSystem.Spacing.md) {
-            Image(systemName: appState.isConfigMode ? "square.dashed" : "eye.circle.fill")
+            Image(systemName: "eye.circle.fill")
                 .font(.system(size: 16))
-                .foregroundColor(appState.isConfigMode ? DesignSystem.Colors.accentAmber : DesignSystem.Colors.accent)
+                .foregroundColor(DesignSystem.Colors.accent)
 
-            Text(appState.isConfigMode ? "Configure UI" : "Vision Tracker")
+            Text("Vision Tracker")
                 .font(DesignSystem.Typography.title)
                 .foregroundColor(DesignSystem.Colors.textPrimary)
 
             Spacer()
 
-            if appState.isConfigMode {
-                // Config mode pill
-                HStack(spacing: 5) {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 10))
-                    Text("\(appState.uiElementConfigs.count)/3 labeled")
-                        .font(DesignSystem.Typography.caption)
-                }
-                .foregroundColor(DesignSystem.Colors.accentAmber)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Capsule().fill(DesignSystem.Colors.accentAmber.opacity(0.12)))
-            } else {
-                // OCR status pill
+            // OCR status pill
                 HStack(spacing: 5) {
                     Circle()
                         .fill(appState.mode == .running ? DesignSystem.Colors.accentGreen : DesignSystem.Colors.textTertiary)
@@ -71,7 +54,6 @@ struct TrackerHeaderView: View {
                               : DesignSystem.Colors.backgroundTertiary)
                 )
 
-                // Annotation count badge
                 if !appState.trackerAnnotations.isEmpty {
                     Text("\(appState.trackerAnnotations.count) detected")
                         .font(DesignSystem.Typography.caption)
@@ -81,7 +63,6 @@ struct TrackerHeaderView: View {
                         .background(DesignSystem.Colors.accent.opacity(0.12))
                         .cornerRadius(DesignSystem.Radius.sm)
                 }
-            }
         }
         .padding(.horizontal, DesignSystem.Spacing.lg)
         .frame(height: 44)
@@ -157,7 +138,9 @@ struct StandbyPlaceholderView: View {
 
             // ── Config Button ────────────────────────────────
             Button {
-                appState.enterConfigMode()
+                if let bundleId = appState.selectedBundleIdentifier {
+                    PythonBridge.shared.startConfigUI(bundleId: bundleId)
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "gearshape.fill")
@@ -166,11 +149,14 @@ struct StandbyPlaceholderView: View {
                         .font(DesignSystem.Typography.bodyMedium)
 
                     // Tick if config already exists for selected app
-                    if let bundleId = appState.selectedBundleIdentifier,
-                       ConfigPersistence.hasConfig(for: bundleId) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(DesignSystem.Colors.accentGreen)
+                    if let bundleId = appState.selectedBundleIdentifier {
+                        let configUrl = FileManager.default.homeDirectoryForCurrentUser
+                            .appendingPathComponent(".chat-automator/\(bundleId)_ui_config.json")
+                        if FileManager.default.fileExists(atPath: configUrl.path) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundColor(DesignSystem.Colors.accentGreen)
+                        }
                     }
                 }
                 .foregroundColor(appState.selectedAppId != nil ? .white : DesignSystem.Colors.textTertiary)

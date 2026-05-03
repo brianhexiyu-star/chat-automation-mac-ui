@@ -96,6 +96,42 @@ class PythonBridge: ObservableObject {
         }
     }
 
+    // MARK: - Config UI
+    
+    /// Starts the standalone Python config UI script.
+    func startConfigUI(bundleId: String) {
+        let scriptPath = "/Users/xiyuhe/Desktop/antigravity/social_bot/config_ui.py"
+        guard FileManager.default.fileExists(atPath: scriptPath) else {
+            appState?.addLog("Config UI script not found at \(scriptPath)", level: .error)
+            return
+        }
+        
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        proc.arguments = [scriptPath, bundleId]
+        
+        // We do not need to stream output for this standalone script, but we can capture it just in case
+        let outPipe = Pipe()
+        proc.standardOutput = outPipe
+        proc.standardError = outPipe
+        
+        outPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            if !data.isEmpty, let line = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty {
+                DispatchQueue.main.async {
+                    self?.appState?.addLog("[config_ui] \(line)", level: .info)
+                }
+            }
+        }
+        
+        do {
+            try proc.run()
+            appState?.addLog("Started Config UI for \(bundleId).", level: .success)
+        } catch {
+            appState?.addLog("Failed to start Config UI: \(error.localizedDescription)", level: .error)
+        }
+    }
+
     // MARK: - Send Command
 
     /// Sends a JSON command dictionary to the Python process via stdin.
